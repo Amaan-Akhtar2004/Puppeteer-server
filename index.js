@@ -40,7 +40,7 @@ let page;
 // Initialize Puppeteer browser instance on server start
 (async () => {
   browser = await puppeteer.launch({ headless: true });
-  await page = browser.newPage();
+  page = await browser.newPage();
   await instaLogin(page);
 })();
 

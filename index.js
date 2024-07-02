@@ -36,6 +36,7 @@ const instaLogin = async(page) => {
 
 
 let browser;
+let page;
 // Initialize Puppeteer browser instance on server start
 (async () => {
   browser = await puppeteer.launch({ headless: true });

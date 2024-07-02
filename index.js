@@ -14,13 +14,6 @@ const port = process.env.PORT || 3000;
 
 puppeteer.use(StealthPlugin());
 
-let browser;
-
-// Initialize Puppeteer browser instance on server start
-(async () => {
-  browser = await puppeteer.launch({ headless: true });
-})();
-
 // Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -37,7 +30,12 @@ app.post('/screenshot', async (req, res) => {
     return res.status(400).send('URL is required');
   }
 
+  let browser;
+
   try {
+    // Launch Puppeteer browser instance
+    browser = await puppeteer.launch({ headless: true });
+
     const page = await browser.newPage();
 
     // Set user agent
@@ -60,6 +58,10 @@ app.post('/screenshot', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send('An error occurred while taking the screenshot');
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
 });
 
@@ -74,12 +76,10 @@ app.listen(port, () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
-  await browser.close();
+process.on('SIGINT', () => {
   process.exit();
 });
 
-process.on('SIGTERM', async () => {
-  await browser.close();
+process.on('SIGTERM', () => {
   process.exit();
 });

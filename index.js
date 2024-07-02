@@ -50,7 +50,13 @@ app.post('/screenshot', async (req, res) => {
 
     page.on('request', request => {
       if (request.isNavigationRequest() && request.redirectChain().length !== 0) {
-        request.abort();
+        const originalRequest = request.redirectChain()[0];
+
+        if (originalRequest.url() === url) {
+          request.abort(); // Prevent final redirection if it originates from the original URL
+        } else {
+          request.continue();
+        }
       } else {
         request.continue();
       }

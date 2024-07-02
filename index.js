@@ -14,6 +14,13 @@ const port = process.env.PORT || 3000;
 
 puppeteer.use(StealthPlugin());
 
+let browser;
+
+// Initialize Puppeteer browser instance on server start
+(async () => {
+  browser = await puppeteer.launch({ headless: true });
+})();
+
 // Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -24,24 +31,24 @@ cloudinary.config({
 app.use(bodyParser.json());
 
 app.post('/screenshot', async (req, res) => {
-  const { url } = req.body;
+  const { url, cookies } = req.body;
 
   if (!url) {
     return res.status(400).send('URL is required');
   }
 
-  let browser;
-
   try {
-    // Launch Puppeteer browser instance
-    browser = await puppeteer.launch({ headless: true });
-
     const page = await browser.newPage();
 
     // Set user agent
     await page.setUserAgent(
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36'
     );
+
+    // Set cookies if provided
+    if (cookies && Array.isArray(cookies)) {
+      await page.setCookie(...cookies);
+    }
 
     await page.goto(url, { waitUntil: 'networkidle2' });
 
@@ -58,10 +65,6 @@ app.post('/screenshot', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send('An error occurred while taking the screenshot');
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 });
 
@@ -76,10 +79,12 @@ app.listen(port, () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
+  await browser.close();
   process.exit();
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
+  await browser.close();
   process.exit();
 });

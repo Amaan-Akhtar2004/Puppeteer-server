@@ -31,7 +31,7 @@ cloudinary.config({
 app.use(bodyParser.json());
 
 app.post('/screenshot', async (req, res) => {
-  const { url, cookies } = req.body;
+  const { url } = req.body;
 
   if (!url) {
     return res.status(400).send('URL is required');
@@ -45,10 +45,16 @@ app.post('/screenshot', async (req, res) => {
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36'
     );
 
-    // Set cookies if provided
-    if (cookies && Array.isArray(cookies)) {
-      await page.setCookie(...cookies);
-    }
+    // Enable request interception and handle redirections
+    await page.setRequestInterception(true);
+
+    page.on('request', request => {
+      if (request.isNavigationRequest() && request.redirectChain().length !== 0) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
 
     await page.goto(url, { waitUntil: 'networkidle2' });
 

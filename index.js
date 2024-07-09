@@ -20,16 +20,20 @@ cloudinary.config({
 
 const uploadToCloudinary = (buffer, filename) => {
   return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream({ folder: 'differences', public_id: filename }, (error, result) => {
-      if (error) {
-        return reject(error);
-      }
-      resolve(result);
-    });
+    const passthrough = new PassThrough();
+    passthrough.end(buffer);
 
-    const bufferStream = new PassThrough();
-    bufferStream.end(buffer);
-    bufferStream.pipe(uploadStream);
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { folder: 'differences', public_id: filename },
+      (error, result) => {
+        if (error) {
+          return reject(error);
+        }
+        resolve(result);
+      }
+    );
+
+    passthrough.pipe(uploadStream);
   });
 };
 

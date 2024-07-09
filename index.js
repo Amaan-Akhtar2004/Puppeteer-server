@@ -13,7 +13,7 @@ let browser;
 
 const uploadToCloudinary = (buffer, filename) => {
   return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.v2.uploader.upload_stream({ folder: 'differences', public_id: filename }, (error, result) => {
+    const uploadStream = cloudinary.uploader.upload_stream({ folder: 'differences', public_id: filename }, (error, result) => {
       if (error) {
         return reject(error);
       }

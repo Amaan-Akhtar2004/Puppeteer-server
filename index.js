@@ -1,112 +1,149 @@
 const express = require('express');
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const cloudinary = require('cloudinary').v2;
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
-const bodyParser = require('body-parser');
-
-dotenv.config();
+const puppeteer = require('puppeteer');
+const { v4: uuidv4 } = require('uuid');
+const { PNG } = require('pngjs');
+const runLoginByPass = require('./runLoginByPass.js');
+const uploadToCloudinary = require('./uploadToCloudinary.js');
 
 const app = express();
-const port = process.env.PORT || 3000;
-
-puppeteer.use(StealthPlugin());
+const port = 3000;
 
 let browser;
-let page;
 
-const username = "agam.kapil@sprinklr.com"
-const password = "erenNaruto@123"
+const uploadToCloudinary = (buffer, filename) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.v2.uploader.upload_stream({ folder: 'differences', public_id: filename }, (error, result) => {
+      if (error) {
+        return reject(error);
+      }
+      resolve(result);
+    });
 
-// https://github.com/hugh-bowie/instagram-bot
-function r(min, max) {
-	return ~~(Math.random() * (max - min) + min);
-}
-
-const r15 = r(1000, 1500);
-
-const instaLogin = async(page) => {
-
-    await page.goto('https://www.instagram.com/accounts/login/?source=auth_switcher', { waitUntil: 'networkidle2' });
-    await page.waitForSelector("input[name='username']");
-    await page.tap("input[name='username']");
-    await page.type("input[name='username']", username, { delay: r(50, 100) });
-    await page.type("input[name='password']", password, { delay: r(50, 100) });
-    await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle2' }), page.tap("[type='submit']")]);
-  
-    console.log('Logged in successfully');
-}
-
-// Initialize Puppeteer browser instance on server start
-(async () => {
-  browser = await puppeteer.launch({ headless: true });
-  page = await browser.newPage();
-  await instaLogin(page);
-})();
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-app.use(bodyParser.json());
-
-app.post('/screenshot', async (req, res) => {
-  const { url } = req.body;
-
-  if (!url) {
-    return res.status(400).send('URL is required');
-  }
-
-  try {
-    const page = await browser.newPage();
-
-    // Set user agent
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    );
-
-    await page.goto(url, { waitUntil: 'networkidle2' });
-
-    const screenshotPath = path.join(__dirname, 'screenshot.png');
-    await page.screenshot({ path: screenshotPath, fullPage: true });
-
-    // Upload screenshot to Cloudinary
-    const cloudinaryResponse = await uploadToCloudinary(screenshotPath);
-
-    // Remove the screenshot file after upload
-    fs.unlinkSync(screenshotPath);
-
-    await page.close();
-
-    res.json({ url: cloudinaryResponse.secure_url });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('An error occurred while taking the screenshot');
-  }
-});
-
-const uploadToCloudinary = async (filePath) => {
-  return cloudinary.uploader.upload(filePath, {
-    folder: 'differences',
+    uploadStream.end(buffer);
   });
 };
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+async function runLoginByPass(page, loginByPassCode) {
+  try {
+    // Create a new function using JavaScript's Function constructor
+    const runCode = new Function(`
+      return (async () => {
+        ${loginByPassCode}
+      })();
+    `);
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  await browser.close();
-  process.exit();
-});
+    // Evaluate the dynamically created function inside the page context
+    await page.evaluate(runCode);
 
-process.on('SIGTERM', async () => {
-  await browser.close();
-  process.exit();
-});
+    // Return success status
+    return true;
+  
+  } catch (error) {
+    console.error('Error executing loginByPass code:', error);
+    
+    // Return failure status
+    return false;
+  }
+}
+
+(async () => {
+  // Initialize Puppeteer
+  browser = await puppeteer.launch({ headless: true });
+
+  // Middleware to parse JSON requests
+  app.use(express.json());
+
+  // Endpoint to process URL
+  app.post('/screenshot', async (req, res) => {
+    const { url, imageName, divSelector, loginByPass } = req.body;
+
+    // UUID's random string
+    const index = uuidv4();
+
+    try {
+      // Initialize a new page
+      const page = await browser.newPage();
+
+      // Set User agent so that request appears to be sent by a browser
+      await page.setUserAgent(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
+      );
+
+      // Set Timezone
+      await page.emulateTimezone('Asia/Kolkata');
+
+      let successfulLoginByPass = true;
+
+      await page.goto(url, { waitUntil: ['domcontentloaded', 'networkidle2'] });
+      await page.setViewport({ width: 1920, height: 1080 });
+
+      // If there exists loginByPass code run it on the page 
+      if (loginByPass) {
+        successfulLoginByPass = await runLoginByPass(page, loginByPass);
+      }
+
+      let element;
+      try {
+        await page.waitForSelector(divSelector, { timeout: 30000 });
+
+        // Wait for all images within the div to be fully loaded
+        await page.evaluate(async (sel) => {
+          const element = document.querySelector(sel);
+          if (element) {
+            const images = Array.from(element.querySelectorAll('img'));
+            await Promise.all(images.map(img => {
+              if (img.complete) return Promise.resolve();
+              return new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+              });
+            }));
+          }
+        }, divSelector);
+
+        // Increase the z-index of the div selected in every case
+        await page.evaluate((sel) => {
+          const element = document.querySelector(sel);
+          if (element) {
+            element.style.zIndex = 10000000;
+          }
+        }, divSelector);
+
+        element = await page.$(divSelector);
+      } catch (timeoutError) {
+        console.warn(`Selector ${divSelector} not found within the timeout period. Taking full page screenshot.`);
+      }
+
+      let screenshotBuffer;
+      if (successfulLoginByPass && element) {
+        screenshotBuffer = await element.screenshot({ encoding: 'binary' });
+      } else {
+        screenshotBuffer = await page.screenshot({ encoding: 'binary', fullPage: true });
+      }
+
+      // Upload the latest screenshot
+      const uploadNewImage = await uploadToCloudinary(screenshotBuffer, `${index}.png`);
+
+      // Close the page after uploads are complete
+      await page.close();
+
+      // Return the result object
+      res.json({ referenceUrl: uploadNewImage.secure_url });
+
+    } catch (error) {
+      console.error(`Error capturing screenshot for ${url}:`, error);
+      res.status(500).json({ error: 'Error capturing screenshot' });
+    }
+  });
+
+  // Start the server
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
+
+  // Close the browser when the process exits
+  process.on('exit', async () => {
+    await browser.close();
+  });
+
+})();

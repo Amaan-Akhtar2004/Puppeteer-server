@@ -56,7 +56,7 @@ async function runLoginByPass(page, loginByPassCode) {
 
   // Endpoint to process URL
   app.post('/screenshot', async (req, res) => {
-    const { url, imageName, divSelector, loginByPass } = req.body;
+    const { url, divSelector, loginByPass } = req.body;
 
     // UUID's random string
     const index = uuidv4();

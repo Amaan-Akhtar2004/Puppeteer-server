@@ -11,6 +11,12 @@ const port = 3000;
 
 let browser;
 
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY,
+  api_secret: process.env.NEXT_PUBLIC_CLOUDINARY_API_SECRET,
+});
+
 const uploadToCloudinary = (buffer, filename) => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream({ folder: 'differences', public_id: filename }, (error, result) => {

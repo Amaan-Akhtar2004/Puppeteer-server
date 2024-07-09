@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { PNG } = require('pngjs');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const cloudinary = require('cloudinary').v2;
+const { PassThrough } = require('stream');
 puppeteer.use(StealthPlugin());
 
 const app = express();
@@ -26,7 +27,9 @@ const uploadToCloudinary = (buffer, filename) => {
       resolve(result);
     });
 
-    uploadStream.end(buffer);
+    const bufferStream = new PassThrough();
+    bufferStream.end(buffer);
+    bufferStream.pipe(uploadStream);
   });
 };
 

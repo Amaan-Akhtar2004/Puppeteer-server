@@ -142,6 +142,9 @@ async function runLoginByPass(page, loginByPassCode) {
       await page.close();
 
       // Return the result object
+
+      console.log({ referenceUrl: uploadNewImage.secure_url })
+      
       res.json({ referenceUrl: uploadNewImage.secure_url });
 
     } catch (error) {

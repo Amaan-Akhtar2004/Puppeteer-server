@@ -1,9 +1,10 @@
 const express = require('express');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
 const { v4: uuidv4 } = require('uuid');
 const { PNG } = require('pngjs');
-const runLoginByPass = require('./runLoginByPass.js');
-const uploadToCloudinary = require('./uploadToCloudinary.js');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+puppeteer.use(StealthPlugin());
 
 const app = express();
 const port = 3000;
@@ -37,17 +38,17 @@ async function runLoginByPass(page, loginByPassCode) {
 
     // Return success status
     return true;
-  
+
   } catch (error) {
     console.error('Error executing loginByPass code:', error);
-    
+
     // Return failure status
     return false;
   }
 }
 
 (async () => {
-  // Initialize Puppeteer
+  // Initialize Puppeteer with the stealth plugin
   browser = await puppeteer.launch({ headless: true });
 
   // Middleware to parse JSON requests
@@ -77,7 +78,7 @@ async function runLoginByPass(page, loginByPassCode) {
       await page.goto(url, { waitUntil: ['domcontentloaded', 'networkidle2'] });
       await page.setViewport({ width: 1920, height: 1080 });
 
-      // If there exists loginByPass code run it on the page 
+      // If there exists loginByPass code run it on the page
       if (loginByPass) {
         successfulLoginByPass = await runLoginByPass(page, loginByPass);
       }

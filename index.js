@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer-extra');
 const { v4: uuidv4 } = require('uuid');
 const { PNG } = require('pngjs');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-
+const cloudinary = require('cloudinary').v2;
 puppeteer.use(StealthPlugin());
 
 const app = express();

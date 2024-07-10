@@ -5,6 +5,9 @@ const { PNG } = require('pngjs');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const cloudinary = require('cloudinary').v2;
 const { PassThrough } = require('stream');
+const axios = require('axios');
+const qs = require('qs');
+
 puppeteer.use(StealthPlugin());
 
 const app = express();
@@ -36,6 +39,33 @@ const uploadToCloudinary = (buffer, filename) => {
     passthrough.pipe(uploadStream);
   });
 };
+
+async function getRedditAccessToken() {
+  const clientId = 'iqGq9u2Naz59VRlfSNLRZQ';
+  const clientSecret = 'zAnYlxSLBL0eWcZ6vbgQjXDRUZKemA';
+  const username = 'Aggravating-Scale255';
+  const password = 'sprinklrintern';
+
+  const tokenResponse = await axios.post(
+    'https://www.reddit.com/api/v1/access_token',
+    qs.stringify({
+      grant_type: 'password',
+      username: username,
+      password: password,
+    }),
+    {
+      auth: {
+        username: clientId,
+        password: clientSecret,
+      },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    }
+  );
+
+  return tokenResponse.data.access_token;
+}
 
 async function runLoginByPass(page, loginByPassCode) {
   try {
@@ -75,6 +105,9 @@ async function runLoginByPass(page, loginByPassCode) {
     const index = uuidv4();
 
     try {
+      // Get Reddit access token
+      const accessToken = await getRedditAccessToken();
+
       // Initialize a new page
       const page = await browser.newPage();
 
@@ -82,6 +115,14 @@ async function runLoginByPass(page, loginByPassCode) {
       await page.setUserAgent(
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
       );
+
+      // Intercept requests to add the Authorization header
+      await page.setRequestInterception(true);
+      page.on('request', (request) => {
+        const headers = request.headers();
+        headers['Authorization'] = `Bearer ${accessToken}`;
+        request.continue({ headers });
+      });
 
       // Set Timezone
       await page.emulateTimezone('Asia/Kolkata');
